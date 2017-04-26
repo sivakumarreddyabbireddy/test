@@ -1,0 +1,106 @@
+################################################################################################
+#                                                                                              #
+#                     CONNECTIVITY AND SHARE PATH AVAILABILITY CHECK                           #
+#                                                                                              #
+################################################################################################
+#                                                                                              #
+#  This Script is to check connectivity to the server and fetch the available share paths      #
+#  from the server.                                                                            #
+#                                                                                              #
+################################################################################################
+#                                                                                              #
+#  AUTHOR:  SIVAKUMARREDDY ABBIREDDY                                                           #
+#  VERSION: 1.0                                                                                #
+#  LAST MODIFIED DATE: 28-DEC-2016                                                             #
+#  MODIFIED BY: SIVAKUMARREDDY ABBIREDDY                                                       #
+#  INPUT ARGUMENTS: hostName                                                                   #
+#  OUTPUT ARGUMENTS: output                                                                    #
+#  SUPPORTED VERSIONS: POWERSHELL 2.0 AND ABOVE                                                #
+#  SUPPORTED PLATFORMS: MICROSOFT WINDOWS 2008 AND ABOVE                                       #
+#  DEPENDENCIES: DSOPUtil MODULE (DSOPUtil.PSM1)                                               #
+#  ASSUMPTIONS: POWERSHELL REMOTING IS ENABLED ON THE TARGET MACHINE                           #
+#                                                                                              #
+################################################################################################
+
+# Mandatory line of the script to read the input and output method of the script
+param([parameter(Mandatory=$true)][int]$ipMethod,[parameter(Mandatory=$true)][int]$opMethod)
+
+# Importing the module
+Import-Module DSOPUtil
+
+# Example for logging, Check function help for details
+Write-DSOPLog -logLevel 4 "Script Execution Started..."
+
+# Example for reading input, Check function help for details
+$inputs=Read-DSOPInput -ipMethod $ipMethod
+
+# Example for checking mandatory inputs, Check function help for details
+[string[]]$missingVars=Get-DSOPMissingMandatoryVars -ht $inputs -names @('hostName')
+
+if($missingVars.Count -gt 0)
+{
+    # Example for exiting script, Check function help for details
+    Exit-DSOPScript -exitCode 1 -exitDesc "$missingVars are not provided" -opMethod $opMethod -op @{}
+}
+
+# Example for sending feedback, Check function help for details
+Send-DSOPFeedback -fbLevel 4 "Inputs Successfully read..."
+
+#Initializing Variables
+
+$output = @{}
+
+Try
+	{
+		
+		#Getting the hostName value from the hash table		
+		
+		$hostName = $inputs.hostName
+		
+		Write-DSOPLog -logLevel 4 "Computer Name : $hostName"	
+
+		#Testing connectivity for the server
+		
+		$testConnect = Test-Connection -computername $hostName -ErrorAction Stop
+		
+		if($?)
+		{		
+			Write-DSOPLog -logLevel 4 "Connection Check Successful to server : $hostName"			
+			
+			#Get the share paths available on the server
+			
+			$share = Get-WmiObject win32_share -computername $hostName -Filter "Type = 0" -Credential $cred -ErrorAction Stop
+			
+			if($?)
+			{
+				Write-DSOPLog -logLevel 4 "Fetched available share paths on the server"
+			}
+			else
+			{				
+				Write-DSOPLog -logLevel 2 "Failed to fetch the available shares from the server"
+				
+				Exit-DSOPScript -exitCode 1 -exitDesc "Failed to fetch the available shares from the server" -opMethod 1 -op @{}
+			}
+		}
+		else
+		{			
+			Write-DSOPLog -logLevel 2 "Failed to connect to server : $hostName"
+			
+			Exit-DSOPScript -exitCode 1 -exitDesc "Failed to connect to server : $hostName" -opMethod 1 -op @{}							
+		}
+	}
+Catch
+	{		
+		Write-DSOPLog -logLevel 2 "$Error.Exception.Message[0]"
+		
+		Exit-DSOPScript -exitCode 1 -exitDesc "$Error.Exception.Message[0]" -opMethod 1 -op @{}
+	}
+	
+Write-DSOPLog -logLevel 4 "Script Execution Completed..."
+
+$output.Add("shares","$share")
+
+Exit-DSOPScript -exitCode 0 -exitDesc "Script execution successfully completed..." -opMethod 1 -op $output
+
+	
+
